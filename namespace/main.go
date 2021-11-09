@@ -10,7 +10,7 @@ import (
 func main() {
 	cmd := exec.Command("sh")
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CloneFlags: syscall.CLONENEWUTS,
+		Cloneflags: syscall.CLONE_NEWUTS,
 	}
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
