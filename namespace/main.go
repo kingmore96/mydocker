@@ -15,11 +15,22 @@ func main() {
 			syscall.CLONE_NEWPID |
 			syscall.CLONE_NEWNS |
 			syscall.CLONE_NEWUSER,
+		UidMappings: []syscall.SysProcIDMap{
+			{
+				ContainerID: 10086,
+				HostID:      syscall.Getuid(),
+				Size:        1,
+			},
+		},
+		GidMappings: []syscall.SysProcIDMap{
+			{
+				ContainerID: 10086,
+				HostID:      syscall.Getgid(),
+				Size:        1,
+			},
+		},
 	}
-	cmd.SysProcAttr.Credential = &syscall.Credential{
-		Uid: 1,
-		Gid: 1,
-	}
+
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -27,5 +38,4 @@ func main() {
 	if err := cmd.Run(); err != nil {
 		log.Fatal(err)
 	}
-	// os.Exit(-1)
 }
