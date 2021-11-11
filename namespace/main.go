@@ -13,7 +13,12 @@ func main() {
 		Cloneflags: syscall.CLONE_NEWUTS |
 			syscall.CLONE_NEWIPC |
 			syscall.CLONE_NEWPID |
-			syscall.CLONE_NEWNS,
+			syscall.CLONE_NEWNS |
+			syscall.CLONE_NEWUSER,
+	}
+	cmd.SysProcAttr.Credential = &syscall.Credential{
+		Uid: 1,
+		Gid: 1,
 	}
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -22,5 +27,5 @@ func main() {
 	if err := cmd.Run(); err != nil {
 		log.Fatal(err)
 	}
-
+	// os.Exit(-1)
 }
