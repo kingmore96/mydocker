@@ -1,0 +1,2 @@
+I am image layer 2
+I changed image layer 2
