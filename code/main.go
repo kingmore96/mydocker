@@ -43,17 +43,56 @@ var runCommand = cli.Command{
 			Name:  "ti",
 			Usage: "enable tty",
 		},
+		cli.StringFlag{
+			Name:  "m",
+			Usage: "limit memory",
+		},
+		cli.StringFlag{
+			Name:  "cpuset",
+			Usage: "limit cpuset",
+		},
+		cli.StringFlag{
+			Name:  "cpushare",
+			Usage: "limit cpushare",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		tty := c.Bool("ti")
 		log.Debugf("ti is %t", tty)
-		//get command and tty And Run it
+		//get command and tty
 		if len(c.Args()) == 0 {
 			return fmt.Errorf("missing container command")
 		}
 		cmd := c.Args().Get(0)
+		//get cgroups flags
+		// rc := &ResourceConfig{
+		// 	MemoryLimit: c.String("m"),
+		// 	Cpuset:      c.String("cpuset"),
+		// 	Cpushare:    c.String("cpushare"),
+		// }
+		ResourceConfigMap["memory"].Value = c.String("m")
+		ResourceConfigMap["cpuset"].Value = c.String("cpuset")
+		ResourceConfigMap["cpushare"].Value = c.String("cpushare")
+		//Run it
 		Run(tty, cmd)
 		return nil
+	},
+}
+
+type ResourceConfig struct {
+	Value    string
+	RootPath string
+}
+
+var ResourceConfigMap = map[string]*ResourceConfig{
+	"memory": &ResourceConfig{
+		RootPath: "/sys/fs/cgroup/memory",
+	},
+	"cpuset": &ResourceConfig{
+		RootPath: "/sys/fs/cgroup/cpuset",
+	},
+	"cpushare": &ResourceConfig{
+		RootPath: "/sys/fs/cgroup/cpu",
 	},
 }
 

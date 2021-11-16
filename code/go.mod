@@ -1,4 +1,4 @@
-module github.com/kingmore96/mydocker/code3-1
+module github.com/kingmore96/mydocker/code
 
 go 1.17
 
