@@ -63,7 +63,10 @@ var runCommand = cli.Command{
 		if len(c.Args()) == 0 {
 			return fmt.Errorf("missing container command")
 		}
-		cmd := c.Args().Get(0)
+		var comArr []string
+		for _, arg := range c.Args() {
+			comArr = append(comArr, arg)
+		}
 		//get cgroups flags
 		// rc := &ResourceConfig{
 		// 	MemoryLimit: c.String("m"),
@@ -74,25 +77,28 @@ var runCommand = cli.Command{
 		ResourceConfigMap["cpuset"].Value = c.String("cpuset")
 		ResourceConfigMap["cpushare"].Value = c.String("cpushare")
 		//Run it
-		Run(tty, cmd)
-		return nil
+		return Run(tty, comArr)
 	},
 }
 
 type ResourceConfig struct {
 	Value    string
 	RootPath string
+	FileName string
 }
 
 var ResourceConfigMap = map[string]*ResourceConfig{
-	"memory": &ResourceConfig{
+	"memory": {
 		RootPath: "/sys/fs/cgroup/memory",
+		FileName: "memory.limit_in_bytes",
 	},
-	"cpuset": &ResourceConfig{
+	"cpuset": {
 		RootPath: "/sys/fs/cgroup/cpuset",
+		FileName: "cpuset.cpus",
 	},
-	"cpushare": &ResourceConfig{
+	"cpushare": {
 		RootPath: "/sys/fs/cgroup/cpu",
+		FileName: "cpu.shares",
 	},
 }
 
@@ -102,6 +108,6 @@ var initCommand = cli.Command{
 	Hidden: true,
 	Action: func(c *cli.Context) error {
 		log.Debugln("start to init")
-		return RunContainerInitProcess(c.Args()[0], nil)
+		return RunContainerInitProcess(c.Args()[0], c.Args()[1:])
 	},
 }
