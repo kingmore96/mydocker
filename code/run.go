@@ -13,10 +13,23 @@ import (
 
 func Run(tty bool, comArr []string) error {
 	logrus.Debugf("comArr is %v", comArr)
+
+	r, w, err := os.Pipe()
+	defer func() {
+		r.Close()
+		w.Close()
+	}()
+
+	if err != nil {
+		return fmt.Errorf("pipe failed %v", err)
+	}
+
 	var ca []string
 	ca = append(ca, "init")
 	ca = append(ca, comArr...)
 	container := exec.Command("/proc/self/exe", ca...)
+	//send the r to container
+	container.ExtraFiles = []*os.File{r}
 	logrus.Debugf("ca is %v", ca)
 	container.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWUTS |
@@ -66,20 +79,35 @@ func Run(tty bool, comArr []string) error {
 			}
 			//clean code
 			defer os.RemoveAll(dirPath)
-			//write pid
-			taskPath := path.Join(dirPath, "tasks")
-			if err := os.WriteFile(taskPath, []byte(strconv.Itoa(container.Process.Pid)), 0644); err != nil {
-				err = fmt.Errorf("%s %s write to tasks error %v", context, configString, err)
-				return err
-			}
 			//write cgroup limit
 			limitPath := path.Join(dirPath, v.FileName)
 			if err := os.WriteFile(limitPath, []byte(v.Value), 0644); err != nil {
 				err = fmt.Errorf("%s %s write to limit error %v", context, configString, err)
 				return err
 			}
+			//cpuset need to fill in the cpu.mems
+			if v.FileName == "cpuset.cpus" {
+				cpumemPath := path.Join(dirPath, "cpuset.mems")
+				if err := os.WriteFile(cpumemPath, []byte("0"), 0644); err != nil {
+					err = fmt.Errorf("%s %s write to limit error %v", context, configString, err)
+					return err
+				}
+			}
+			//write pid
+			taskPath := path.Join(dirPath, "tasks")
+			if err := os.WriteFile(taskPath, []byte(strconv.Itoa(container.Process.Pid)), 0644); err != nil {
+				err = fmt.Errorf("%s %s write to tasks error %v", context, configString, err)
+				return err
+			}
 		}
 	}
+	//finish cgroup and send the signal to child process
+	_, err = w.WriteString("o")
+	logrus.Debug("write signal finish")
+	if err != nil {
+		return fmt.Errorf("parent process write finish signal false %v", err)
+	}
+	w.Close()
 	container.Wait()
 	return nil
 }
