@@ -16,24 +16,22 @@ func RunContainerInitProcess(cmd string, args []string) error {
 	//get r pipe
 	r := os.NewFile(uintptr(3), "pipe")
 
-	//look path
-	ap, err := exec.LookPath(cmd)
-	if err != nil {
-		return fmt.Errorf("exec.LookPath(%s) = %v", cmd, err)
-	}
+	ap := cmd
 	ctx := fmt.Sprintf("command=%s ,args=%v", ap, args)
 
 	//mountpoint private
-	err = syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "") //等价于mount --make-rprivate /
+	err := syscall.Mount("", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "") //等价于mount --make-rprivate /
 	if err != nil {
 		return fmt.Errorf("%s : mount --make-rprivate error %v", ctx, err)
 	}
+	logrus.Debugf("%s : mount --make-rprivate success", ctx)
 
 	//start pivot_root
 	newRoot, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("os.Getwd error : %v", err)
 	}
+	logrus.Debugf("%s : os.Getwd = %s", ctx, newRoot)
 
 	//mkputold dir
 	putold := path.Join(newRoot, ".putold")
@@ -41,12 +39,14 @@ func RunContainerInitProcess(cmd string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("mk putold error : %v", err)
 	}
+	logrus.Debugf("%s : mk putold success", ctx)
 
 	//bind to itself to make newRoot as an mountpoint
 	err = syscall.Mount(newRoot, newRoot, "bind", syscall.MS_BIND|syscall.MS_REC, "")
 	if err != nil {
 		return fmt.Errorf("bind newRoot error : %v", err)
 	}
+	logrus.Debugf("%s : bind newRoot success", ctx)
 
 	//do PivotRoot
 	err = syscall.PivotRoot(newRoot, putold)
@@ -54,22 +54,12 @@ func RunContainerInitProcess(cmd string, args []string) error {
 		return fmt.Errorf("PivotRoot error: %v", err)
 	}
 
-	//ch and umount putold
+	logrus.Debugf("%s : PivotRoot success", ctx)
+
+	//ch
 	err = os.Chdir("/")
 	if err != nil {
 		return fmt.Errorf("chdir error : %v", err)
-	}
-
-	putold = path.Join("/", ".putold")
-	err = syscall.Unmount(putold, syscall.MNT_DETACH)
-	if err != nil {
-		return fmt.Errorf("unmount error : %v", err)
-	}
-
-	//rm the putold dir
-	err = os.Remove(putold)
-	if err != nil {
-		return fmt.Errorf("remove putold error : %v", err)
 	}
 
 	defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
@@ -84,6 +74,25 @@ func RunContainerInitProcess(cmd string, args []string) error {
 		return fmt.Errorf("%s : mount -t tmpfs tmpfs /dev error %v", ctx, err)
 	}
 
+	//umount putold
+	putold = path.Join("/", ".putold")
+	err = syscall.Unmount(putold, syscall.MNT_DETACH)
+	if err != nil {
+		return fmt.Errorf("unmount error : %v", err)
+	}
+
+	//rm the putold dir
+	err = os.Remove(putold)
+	if err != nil {
+		return fmt.Errorf("remove putold error : %v", err)
+	}
+
+	//look path
+	ap, err = exec.LookPath(cmd)
+	if err != nil {
+		return fmt.Errorf("exec.LookPath(%s) = %v", cmd, err)
+	}
+
 	//syscall.Exec
 	argv := []string{cmd}
 	argv = append(argv, args...)
@@ -95,7 +104,7 @@ func RunContainerInitProcess(cmd string, args []string) error {
 	}
 	logrus.Debugf("%s : read from parent process %v", ctx, string(signal))
 
-	if err := syscall.Exec(ap, argv, os.Environ()); err != nil {
+	if err := syscall.Exec(ap, argv, syscall.Environ()); err != nil {
 		return fmt.Errorf("%s : execve error %v", ctx, err)
 	}
 	return nil
