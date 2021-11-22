@@ -30,6 +30,8 @@ func Run(tty bool, comArr []string) error {
 	container := exec.Command("/proc/self/exe", ca...)
 	//send the r to container
 	container.ExtraFiles = []*os.File{r}
+	//change the container pwd to /root/busybox
+	container.Dir = "/root/busybox"
 	logrus.Debugf("ca is %v", ca)
 	container.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWUTS |
