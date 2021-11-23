@@ -30,8 +30,24 @@ func Run(tty bool, comArr []string) error {
 	container := exec.Command("/proc/self/exe", ca...)
 	//send the r to container
 	container.ExtraFiles = []*os.File{r}
+
 	//change the container pwd to /root/busybox
-	container.Dir = "/root/busybox"
+	// container.Dir = "/root/busybox"
+	//4.2 change the container pwd to /root/mnt which is the aufs file system
+	rootURL := "/root/mnt"
+	if err := os.Mkdir(rootURL, 0755); err != nil {
+		if !os.IsExist(err) {
+			return fmt.Errorf("mkdir rootURL %s error %v", rootURL, err)
+		}
+	}
+
+	newRootfsURL := path.Join("/root/mnt", strconv.Itoa(syscall.Getpid()))
+	//make /mnt
+	if err := buildNewRootfs(newRootfsURL); err != nil {
+		return fmt.Errorf("build new rootfs failed %v", err)
+	}
+	container.Dir = path.Join(newRootfsURL, "mnt")
+
 	logrus.Debugf("ca is %v", ca)
 	container.SysProcAttr = &syscall.SysProcAttr{
 		Cloneflags: syscall.CLONE_NEWUTS |
@@ -111,5 +127,51 @@ func Run(tty bool, comArr []string) error {
 	}
 	w.Close()
 	container.Wait()
+	return nil
+}
+
+func buildNewRootfs(newRootURL string) error {
+	//mkdir newRoolURL
+	_, err := os.Stat(newRootURL)
+	if err == nil {
+		//rm the dir
+		os.RemoveAll(newRootURL)
+		logrus.Debugf("remove newRootURL dir %s", newRootURL)
+	}
+
+	err = os.Mkdir(newRootURL, 0755)
+	if err != nil {
+		return fmt.Errorf("mkdir newRootURL %s error %v", newRootURL, err)
+	}
+
+	//mkdir readonly layer
+	busyboxURL := path.Join(newRootURL, "busybox")
+	err = os.Mkdir(busyboxURL, 0755)
+	if err != nil {
+		return fmt.Errorf("mkdir newRootURL %s/busybox error %v", newRootURL, err)
+	}
+
+	//tar -xvf /root/busybox.tar -C newRootURL/busybox/
+	if err := exec.Command("tar", "-xvf", "/root/busybox.tar", "-C", busyboxURL).Run(); err != nil {
+		return fmt.Errorf("untar /root/busybox failed %v", err)
+	}
+
+	//mkdir write layer
+	writeLayer := path.Join(newRootURL, "writeLayer")
+	err = os.Mkdir(writeLayer, 0755)
+	if err != nil {
+		return fmt.Errorf("mkdir newRootURL %s/writeLayer error %v", newRootURL, err)
+	}
+
+	//mount
+	mntURL := path.Join(newRootURL, "mnt")
+	err = os.Mkdir(mntURL, 0755)
+	if err != nil {
+		return fmt.Errorf("mkdir newRootURL %s/mnt error %v", newRootURL, err)
+	}
+	if err := exec.Command("mount", "-t", "aufs", "-o", "dirs="+writeLayer+":"+busyboxURL, "none", mntURL).Run(); err != nil {
+		return fmt.Errorf("mount error %v", err)
+	}
+
 	return nil
 }
