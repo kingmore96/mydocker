@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -20,6 +21,7 @@ func main() {
 	app.Commands = []cli.Command{
 		runCommand,
 		initCommand,
+		commitCommand,
 	}
 
 	app.Before = func(c *cli.Context) error {
@@ -110,5 +112,38 @@ var initCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		log.Debugln("start to init")
 		return RunContainerInitProcess(c.Args()[0], c.Args()[1:])
+	},
+}
+
+var commitCommand = cli.Command{
+	Name:  "commit",
+	Usage: "commit the container into image tar",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "cid",
+			Usage: "container id",
+		},
+		cli.StringFlag{
+			Name:  "tin",
+			Usage: "tar image name",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		log.Debugln("start to commit")
+		//check params
+		cid := c.String("cid")
+		if cid == "" {
+			return fmt.Errorf("missing container id")
+		}
+
+		tin := c.String("tin")
+		if tin == "" {
+			tin = cid + ".tar"
+		} else {
+			if !strings.HasSuffix(tin, ".tar") {
+				tin += ".tar"
+			}
+		}
+		return CommitContainer(cid, tin)
 	},
 }
