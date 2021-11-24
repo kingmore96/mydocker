@@ -55,6 +55,10 @@ var runCommand = cli.Command{
 			Name:  "cpushare",
 			Usage: "limit cpushare",
 		},
+		cli.StringFlag{
+			Name:  "v",
+			Usage: "volume",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		tty := c.Bool("ti")
@@ -68,16 +72,13 @@ var runCommand = cli.Command{
 			comArr = append(comArr, arg)
 		}
 		//get cgroups flags
-		// rc := &ResourceConfig{
-		// 	MemoryLimit: c.String("m"),
-		// 	Cpuset:      c.String("cpuset"),
-		// 	Cpushare:    c.String("cpushare"),
-		// }
 		ResourceConfigMap["memory"].Value = c.String("m")
 		ResourceConfigMap["cpuset"].Value = c.String("cpuset")
 		ResourceConfigMap["cpushare"].Value = c.String("cpushare")
+		//get volume config
+		volume := c.String("v")
 		//Run it
-		return Run(tty, comArr)
+		return Run(tty, comArr, volume)
 	},
 }
 

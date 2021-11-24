@@ -6,12 +6,13 @@ import (
 	"os/exec"
 	"path"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/sirupsen/logrus"
 )
 
-func Run(tty bool, comArr []string) error {
+func Run(tty bool, comArr []string, volume string) error {
 	logrus.Debugf("comArr is %v", comArr)
 
 	r, w, err := os.Pipe()
@@ -43,7 +44,7 @@ func Run(tty bool, comArr []string) error {
 
 	newRootfsURL := path.Join("/root/mnt", strconv.Itoa(syscall.Getpid()))
 	//make /mnt
-	if err := buildNewRootfs(newRootfsURL); err != nil {
+	if err := buildNewRootfs(newRootfsURL, volume); err != nil {
 		return fmt.Errorf("build new rootfs failed %v", err)
 	}
 	container.Dir = path.Join(newRootfsURL, "mnt")
@@ -127,10 +128,37 @@ func Run(tty bool, comArr []string) error {
 	}
 	w.Close()
 	container.Wait()
+	//delete all resource
+	deleteRootfs(newRootfsURL, volume)
 	return nil
 }
 
-func buildNewRootfs(newRootURL string) error {
+func deleteRootfs(newRootfsURL string, volume string) {
+	mntURL := path.Join(newRootfsURL, "mnt")
+	//umount container volume : need to check param, so we can move the check step to firstone function
+	if volume != "" {
+		vs := strings.Split(volume, ":")
+		if len(vs) == 2 && vs[0] != "" && vs[1] != "" && strings.HasPrefix(vs[0], "/") && strings.HasPrefix(vs[1], "/") {
+			//umount container volume before remove the dir
+			cv := path.Join(mntURL, vs[1])
+			if err := syscall.Unmount(cv, syscall.MNT_DETACH); err != nil {
+				logrus.Errorf("umount container volume %s failed : %v", cv, err)
+			}
+		}
+	}
+
+	//umount newRootfsURL/mnt
+	if err := syscall.Unmount(mntURL, syscall.MNT_DETACH); err != nil {
+		logrus.Errorf("umount mntURL %s failed : %v ", mntURL, err)
+	}
+
+	//rm -r newRootfsURL
+	if err := os.RemoveAll(newRootfsURL); err != nil {
+		logrus.Errorf("rm -r %s failed : %v", newRootfsURL, err)
+	}
+}
+
+func buildNewRootfs(newRootURL string, volume string) error {
 	//mkdir newRoolURL
 	_, err := os.Stat(newRootURL)
 	if err == nil {
@@ -173,5 +201,29 @@ func buildNewRootfs(newRootURL string) error {
 		return fmt.Errorf("mount error %v", err)
 	}
 
+	//volume code
+	if volume != "" {
+		logrus.Debugf("volume section start : %s", volume)
+		// eg: /root/volume:/container/volume
+		//verify volume
+		vs := strings.Split(volume, ":")
+		if len(vs) == 2 && vs[0] != "" && vs[1] != "" && strings.HasPrefix(vs[0], "/") && strings.HasPrefix(vs[1], "/") {
+			//mkdir /root/volume
+			if err := os.MkdirAll(vs[0], 0755); err != nil {
+				return fmt.Errorf("mkdirAll error : %s", vs[0])
+			}
+			//mkdir /container/volume
+			containerVolumePath := path.Join(mntURL, vs[1])
+			if err := os.MkdirAll(containerVolumePath, 0755); err != nil {
+				return fmt.Errorf("mkdirAll error : %s", containerVolumePath)
+			}
+			//mount bind
+			if err := syscall.Mount(vs[0], containerVolumePath, "bind", syscall.MS_BIND, ""); err != nil {
+				return fmt.Errorf("mount --bind error :%s %s", vs[0], containerVolumePath)
+			}
+		} else {
+			return fmt.Errorf("wrong volume %s", volume)
+		}
+	}
 	return nil
 }
