@@ -23,6 +23,7 @@ func main() {
 		initCommand,
 		commitCommand,
 		logCommand,
+		listCommand,
 	}
 
 	app.Before = func(c *cli.Context) error {
@@ -45,6 +46,10 @@ var runCommand = cli.Command{
 		cli.BoolFlag{
 			Name:  "ti",
 			Usage: "run container in the foreground mode if false run it in background mode",
+		},
+		cli.StringFlag{
+			Name:  "name",
+			Usage: "container name",
 		},
 		cli.StringFlag{
 			Name:  "m",
@@ -81,8 +86,9 @@ var runCommand = cli.Command{
 		ResourceConfigMap["cpushare"].Value = c.String("cpushare")
 		//get volume config
 		volume := c.String("v")
+		name := c.String("name")
 		//Run it
-		return Run(tty, comArr, volume)
+		return Run(tty, comArr, volume, name)
 	},
 }
 
@@ -159,5 +165,13 @@ var logCommand = cli.Command{
 		}
 		cid := c.Args().Get(0)
 		return LogContainer(cid)
+	},
+}
+
+var listCommand = cli.Command{
+	Name:  "ps",
+	Usage: "list all container",
+	Action: func(c *cli.Context) error {
+		return ListContainer()
 	},
 }

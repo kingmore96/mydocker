@@ -24,5 +24,5 @@ func LogContainer(cid string) (err error) {
 		return fmt.Errorf("io.ReadAll(file) error : %v", err)
 	}
 	fmt.Println(string(bs))
-	return nil
+	return
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
@@ -14,7 +15,25 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func Run(tty bool, comArr []string, volume string) error {
+type ContainerInfo struct {
+	Id         string `json:"id"`
+	Name       string `json:"name"`
+	Pid        string `json:"pid"`
+	CreateTime string `json:"create_time"`
+	Command    string `json:"command"`
+	Status     string `json:"status"`
+}
+
+const (
+	RUNNING string = "running"
+	STOP    string = "stopped"
+	EXIT    string = "exited"
+)
+
+var DefaultConfigLocation = "/var/run/mydocker/%s"
+var ConfigName = "config.json"
+
+func Run(tty bool, comArr []string, volume string, name string) error {
 	logrus.Debugf("comArr is %v", comArr)
 
 	r, w, err := os.Pipe()
@@ -75,6 +94,7 @@ func Run(tty bool, comArr []string, volume string) error {
 		},
 	}
 
+	var container_id string
 	if tty {
 		container.Stdin = os.Stdin
 		container.Stdout = os.Stdout
@@ -82,9 +102,9 @@ func Run(tty bool, comArr []string, volume string) error {
 	} else {
 		//generate container id
 		t := time.Now().UTC().Unix()
-		buf := make([]byte, 20)
+		buf := make([]byte, 5)
 		rand.Read(buf)
-		container_id := fmt.Sprintf("%x-%x", t, buf[0:])
+		container_id = fmt.Sprintf("%x%x", t, buf[0:])
 		//need to redirect to other files
 		if err := os.MkdirAll(RootLogURL, 0666); err != nil {
 			return fmt.Errorf("os.MkdirAll(/root/logs) error : %v", err)
@@ -106,6 +126,40 @@ func Run(tty bool, comArr []string, volume string) error {
 	if err := container.Start(); err != nil {
 		return fmt.Errorf("container start failed")
 	}
+
+	//save the container info into /var/run/mydocker/container_name/config.json
+	if name == "" {
+		name = container_id
+	}
+	createTime := time.Now().Format("2006-01-02 15:04:05")
+	command := fmt.Sprintf("%s", comArr)
+	ci := &ContainerInfo{
+		Name:       name,
+		Id:         container_id,
+		Pid:        strconv.Itoa(container.Process.Pid),
+		CreateTime: createTime,
+		Command:    command,
+		Status:     RUNNING,
+	}
+	jsonBytes, err := json.Marshal(ci)
+	if err != nil {
+		return fmt.Errorf("json.Marshal error : %v", err)
+	}
+	confiDirPath := fmt.Sprintf(DefaultConfigLocation, name)
+	if err := os.MkdirAll(confiDirPath, 0622); err != nil {
+		return fmt.Errorf("mkdirAll(%s) error : %v", confiDirPath, err)
+	}
+	configPath := path.Join(confiDirPath, ConfigName)
+	f, err := os.OpenFile(configPath, os.O_CREATE|os.O_RDWR, 0622)
+	if err != nil {
+		return fmt.Errorf("create configFile %s error :%v", configPath, err)
+	}
+	defer f.Close()
+	jsonString := string(jsonBytes)
+	if _, err := f.WriteString(jsonString); err != nil {
+		return fmt.Errorf("write config json error : %v", err)
+	}
+	logrus.Debugf("write to config file success %s", jsonString)
 
 	//cgroups code
 	logrus.Infof("new process id is %s", strconv.Itoa(container.Process.Pid))
@@ -155,8 +209,17 @@ func Run(tty bool, comArr []string, volume string) error {
 		container.Wait()
 		//delete all resource
 		deleteRootfs(newRootfsURL, volume)
+		//delete containerInfo
+		deleteContainerInfo(name)
 	}
 	return nil
+}
+
+func deleteContainerInfo(containerName string) {
+	dirURL := fmt.Sprintf(DefaultConfigLocation, containerName)
+	if err := os.RemoveAll(dirURL); err != nil {
+		logrus.Errorf("remove container info %s failed error :%v", dirURL, err)
+	}
 }
 
 func deleteRootfs(newRootfsURL string, volume string) {
