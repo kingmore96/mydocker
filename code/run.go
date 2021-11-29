@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -77,6 +79,28 @@ func Run(tty bool, comArr []string, volume string) error {
 		container.Stdin = os.Stdin
 		container.Stdout = os.Stdout
 		container.Stderr = os.Stderr
+	} else {
+		//generate container id
+		t := time.Now().UTC().Unix()
+		buf := make([]byte, 20)
+		rand.Read(buf)
+		container_id := fmt.Sprintf("%x-%x", t, buf[0:])
+		//need to redirect to other files
+		if err := os.MkdirAll(RootLogURL, 0666); err != nil {
+			return fmt.Errorf("os.MkdirAll(/root/logs) error : %v", err)
+		}
+		logPath := path.Join(RootLogURL, container_id)
+		f, err := os.Create(logPath)
+		if err != nil {
+			return fmt.Errorf("os.Create %s error %v", logPath, err)
+		}
+		//need to close?
+		//defer f.Close()
+
+		container.Stdout = f
+		container.Stderr = f
+		//print the container id to console
+		fmt.Println(container_id)
 	}
 
 	if err := container.Start(); err != nil {
@@ -127,9 +151,11 @@ func Run(tty bool, comArr []string, volume string) error {
 		return fmt.Errorf("parent process write finish signal false %v", err)
 	}
 	w.Close()
-	container.Wait()
-	//delete all resource
-	deleteRootfs(newRootfsURL, volume)
+	if tty {
+		container.Wait()
+		//delete all resource
+		deleteRootfs(newRootfsURL, volume)
+	}
 	return nil
 }
 
@@ -157,6 +183,8 @@ func deleteRootfs(newRootfsURL string, volume string) {
 		logrus.Errorf("rm -r %s failed : %v", newRootfsURL, err)
 	}
 }
+
+var RootLogURL = "/root/logs"
 
 func buildNewRootfs(newRootURL string, volume string) error {
 	//mkdir newRoolURL

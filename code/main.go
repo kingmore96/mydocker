@@ -22,6 +22,7 @@ func main() {
 		runCommand,
 		initCommand,
 		commitCommand,
+		logCommand,
 	}
 
 	app.Before = func(c *cli.Context) error {
@@ -43,7 +44,7 @@ var runCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "ti",
-			Usage: "enable tty",
+			Usage: "run container in the foreground mode if false run it in background mode",
 		},
 		cli.StringFlag{
 			Name:  "m",
@@ -65,6 +66,7 @@ var runCommand = cli.Command{
 	Action: func(c *cli.Context) error {
 		tty := c.Bool("ti")
 		log.Debugf("ti is %t", tty)
+
 		//get command and tty
 		if len(c.Args()) == 0 {
 			return fmt.Errorf("missing container command")
@@ -145,5 +147,17 @@ var commitCommand = cli.Command{
 			}
 		}
 		return CommitContainer(cid, tin)
+	},
+}
+
+var logCommand = cli.Command{
+	Name:  "logs",
+	Usage: "print the specified container log",
+	Action: func(c *cli.Context) error {
+		if len(c.Args()) == 0 {
+			return fmt.Errorf("missing container id")
+		}
+		cid := c.Args().Get(0)
+		return LogContainer(cid)
 	},
 }
