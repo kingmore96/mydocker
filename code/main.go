@@ -175,3 +175,16 @@ var listCommand = cli.Command{
 		return ListContainer()
 	},
 }
+
+var stopCommand = cli.Command{
+	Name:  "stop",
+	Usage: "stop the container process and all the children process it forked",
+	Action: func(c *cli.Context) error {
+		//check if the container name params is passed
+		if len(c.Args()) == 0 {
+			return fmt.Errorf("missing container name")
+		}
+		cn := c.Args().Get(0)
+		return stopContainer(cn)
+	},
+}
