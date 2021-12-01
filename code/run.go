@@ -72,7 +72,7 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 
 	logrus.Debugf("ca is %v", ca)
 	container.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true, //pgid = 0 so the container pgid is its pid
+		// Setpgid: true, //pgid = 0 so the container pgid is its pid
 		Cloneflags: syscall.CLONE_NEWUTS |
 			syscall.CLONE_NEWIPC |
 			syscall.CLONE_NEWPID |
@@ -206,6 +206,7 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 		return fmt.Errorf("parent process write finish signal false %v", err)
 	}
 	w.Close()
+	syscall.Setpgid(container.Process.Pid, container.Process.Pid)
 	if tty {
 		container.Wait()
 		//delete all resource
