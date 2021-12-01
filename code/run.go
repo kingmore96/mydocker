@@ -206,7 +206,7 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 		return fmt.Errorf("parent process write finish signal false %v", err)
 	}
 	w.Close()
-	syscall.Setpgid(container.Process.Pid, container.Process.Pid)
+
 	if tty {
 		container.Wait()
 		//delete all resource
