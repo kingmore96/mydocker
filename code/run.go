@@ -72,6 +72,7 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 
 	logrus.Debugf("ca is %v", ca)
 	container.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true, //pgid = 0 so the container pgid is its pid
 		Cloneflags: syscall.CLONE_NEWUTS |
 			syscall.CLONE_NEWIPC |
 			syscall.CLONE_NEWPID |

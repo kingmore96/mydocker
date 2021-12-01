@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"strconv"
 	"syscall"
@@ -26,7 +28,7 @@ func stopContainer(containerName string) error {
 		return fmt.Errorf("kill -15 -%v error : %v", ipid, err)
 	}
 
-	//check if the process has terminated using ps -g -ipid
+	//check if the process has terminated using ps -Afj | grep groupid
 	for i := 0; i < 10; i++ {
 		success, err := groupTerminated(containerInfo.Pid)
 		if err != nil {
@@ -54,14 +56,14 @@ update_info:
 	return nil
 }
 
-func updateContainerInfo(ci ContainerInfo) error {
+func updateContainerInfo(ci *ContainerInfo) error {
 	ci.Status = STOP
 	ci.Pid = ""
 	jsonBytes, err := json.Marshal(ci)
 	if err != nil {
 		return fmt.Errorf("json.Marshal(ci) error : %v", err)
 	}
-	configPath := path.Join(DefaultConfigLocation, ci.Name, ConfigName)
+	configPath := path.Join(fmt.Sprintf(DefaultConfigLocation, ci.Name), ConfigName)
 	err = os.WriteFile(configPath, jsonBytes, 0622)
 	if err != nil {
 		return fmt.Errorf("os.WriterFile error : %v", err)
@@ -70,9 +72,49 @@ func updateContainerInfo(ci ContainerInfo) error {
 }
 
 func groupTerminated(groupId string) (bool, error) {
+	cmd := exec.Command("/bin/bash", "-c", "ps -Afj | grep "+groupId)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return false, fmt.Errorf("get ps command stdoutpipe error : %v", err)
+	}
 
+	if err := cmd.Start(); err != nil {
+		return false, fmt.Errorf("cmd start error : %v", err)
+	}
+
+	defer cmd.Wait()
+
+	//read until the EOF
+	input := bufio.NewScanner(stdout)
+	line := 0
+	for input.Scan() {
+		//fmt.Println(input.Text())
+		line += 1
+	}
+	//fmt.Println("====")
+
+	//logrus.Debugf("line = %d", line)
+	if input.Err() != nil {
+		return false, fmt.Errorf("stdout pipe scan error : %v", err)
+	}
+
+	if line == 2 {
+		return true, nil
+	}
+	return false, nil
 }
 
-func getContainerInfoByName(containerName string) (ContainerInfo, error) {
+func getContainerInfoByName(containerName string) (*ContainerInfo, error) {
+	configPath := path.Join(fmt.Sprintf(DefaultConfigLocation, containerName), ConfigName)
+	jsonBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("os.ReadFile(%s) error : %v", configPath, err)
+	}
 
+	var containerInfo ContainerInfo
+	err = json.Unmarshal(jsonBytes, &containerInfo)
+	if err != nil {
+		return nil, fmt.Errorf("json.Unmarshal error : %v", err)
+	}
+	return &containerInfo, nil
 }
