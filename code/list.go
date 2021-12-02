@@ -36,15 +36,16 @@ func ListContainer() error {
 
 	//print to terminal
 	w := tabwriter.NewWriter(os.Stdout, 12, 1, 3, ' ', 0)
-	fmt.Fprint(w, "ID\tNAME\tPID\tSTATUS\tCOMMAND\tCREATETIME\n")
+	fmt.Fprint(w, "ID\tNAME\tPID\tSTATUS\tCOMMAND\tCREATETIME\tVOLUME\n")
 	for _, c := range containerInfos {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			c.Id,
 			c.Name,
 			c.Pid,
 			c.Status,
 			c.Command,
 			c.CreateTime,
+			c.Volume,
 		)
 	}
 	if err := w.Flush(); err != nil {

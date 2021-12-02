@@ -22,6 +22,7 @@ type ContainerInfo struct {
 	CreateTime string `json:"create_time"`
 	Command    string `json:"command"`
 	Status     string `json:"status"`
+	Volume     string `json:"volume"`
 }
 
 const (
@@ -145,6 +146,7 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 		CreateTime: createTime,
 		Command:    command,
 		Status:     RUNNING,
+		Volume:     volume,
 	}
 	jsonBytes, err := json.Marshal(ci)
 	if err != nil {
