@@ -7,8 +7,8 @@ import (
 	"path"
 )
 
-func LogContainer(cid string) (err error) {
-	logPath := path.Join(RootLogURL, cid)
+func LogContainer(cname string) (err error) {
+	logPath := path.Join(fmt.Sprintf(DefaultConfigLocation, cname), LogName)
 	f, err := os.Open(logPath)
 	if err != nil {
 		return fmt.Errorf("os.Open(%s) error : %v", logPath, err)

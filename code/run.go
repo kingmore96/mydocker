@@ -32,6 +32,7 @@ const (
 
 var DefaultConfigLocation = "/var/run/mydocker/%s"
 var ConfigName = "config.json"
+var LogName = "container.log"
 
 func Run(tty bool, comArr []string, volume string, name string) error {
 	logrus.Debugf("comArr is %v", comArr)
@@ -101,6 +102,9 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 	buf := make([]byte, 5)
 	rand.Read(buf)
 	container_id := fmt.Sprintf("%x%x", t, buf[0:])
+	if name == "" {
+		name = container_id
+	}
 
 	if tty {
 		container.Stdin = os.Stdin
@@ -108,10 +112,11 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 		container.Stderr = os.Stderr
 	} else {
 		//need to redirect to other files
-		if err := os.MkdirAll(RootLogURL, 0666); err != nil {
-			return fmt.Errorf("os.MkdirAll(/root/logs) error : %v", err)
+		logDirPath := fmt.Sprintf(DefaultConfigLocation, name)
+		if err := os.MkdirAll(logDirPath, 0777); err != nil {
+			return fmt.Errorf("os.MkdirAll(%s) error : %v", logDirPath, err)
 		}
-		logPath := path.Join(RootLogURL, container_id)
+		logPath := path.Join(logDirPath, LogName)
 		f, err := os.Create(logPath)
 		if err != nil {
 			return fmt.Errorf("os.Create %s error %v", logPath, err)
@@ -130,9 +135,6 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 	}
 
 	//save the container info into /var/run/mydocker/container_name/config.json
-	if name == "" {
-		name = container_id
-	}
 	createTime := time.Now().Format("2006-01-02 15:04:05")
 	command := fmt.Sprintf("%s", comArr)
 	ci := &ContainerInfo{
