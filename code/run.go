@@ -95,17 +95,18 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 		},
 	}
 
-	var container_id string
+	// var container_id string
+	//generate container id
+	t := time.Now().UTC().Unix()
+	buf := make([]byte, 5)
+	rand.Read(buf)
+	container_id := fmt.Sprintf("%x%x", t, buf[0:])
+
 	if tty {
 		container.Stdin = os.Stdin
 		container.Stdout = os.Stdout
 		container.Stderr = os.Stderr
 	} else {
-		//generate container id
-		t := time.Now().UTC().Unix()
-		buf := make([]byte, 5)
-		rand.Read(buf)
-		container_id = fmt.Sprintf("%x%x", t, buf[0:])
 		//need to redirect to other files
 		if err := os.MkdirAll(RootLogURL, 0666); err != nil {
 			return fmt.Errorf("os.MkdirAll(/root/logs) error : %v", err)
