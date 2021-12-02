@@ -25,6 +25,7 @@ func main() {
 		logCommand,
 		listCommand,
 		stopCommand,
+		removeCommand,
 	}
 
 	app.Before = func(c *cli.Context) error {
@@ -164,8 +165,8 @@ var logCommand = cli.Command{
 		if len(c.Args()) == 0 {
 			return fmt.Errorf("missing container id")
 		}
-		cid := c.Args().Get(0)
-		return LogContainer(cid)
+		cname := c.Args().Get(0)
+		return LogContainer(cname)
 	},
 }
 
@@ -187,5 +188,17 @@ var stopCommand = cli.Command{
 		}
 		cn := c.Args().Get(0)
 		return stopContainer(cn)
+	},
+}
+
+var removeCommand = cli.Command{
+	Name:  "rm",
+	Usage: "remove the stopped container",
+	Action: func(c *cli.Context) error {
+		if len(c.Args()) == 0 {
+			return fmt.Errorf("missing container name")
+		}
+		cn := c.Args().Get(0)
+		return removeContainer(cn)
 	},
 }
