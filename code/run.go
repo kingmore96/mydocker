@@ -33,6 +33,7 @@ const (
 var DefaultConfigLocation = "/var/run/mydocker/%s"
 var ConfigName = "config.json"
 var LogName = "container.log"
+var DefaultRootfsLocation = "/root/mnt/%s"
 
 func Run(tty bool, comArr []string, volume string, name string) error {
 	logrus.Debugf("comArr is %v", comArr)
@@ -54,17 +55,27 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 	//send the r to container
 	container.ExtraFiles = []*os.File{r}
 
+	// var container_id string
+	//generate container id
+	t := time.Now().UTC().Unix()
+	buf := make([]byte, 5)
+	rand.Read(buf)
+	container_id := fmt.Sprintf("%x%x", t, buf[0:])
+	if name == "" {
+		name = container_id
+	}
+
 	//change the container pwd to /root/busybox
 	// container.Dir = "/root/busybox"
 	//4.2 change the container pwd to /root/mnt which is the aufs file system
-	rootURL := "/root/mnt"
-	if err := os.Mkdir(rootURL, 0755); err != nil {
-		if !os.IsExist(err) {
-			return fmt.Errorf("mkdir rootURL %s error %v", rootURL, err)
-		}
-	}
+	// rootURL := "/root/mnt"
+	// if err := os.Mkdir(rootURL, 0755); err != nil {
+	// 	if !os.IsExist(err) {
+	// 		return fmt.Errorf("mkdir rootURL %s error %v", rootURL, err)
+	// 	}
+	// }
 
-	newRootfsURL := path.Join("/root/mnt", strconv.Itoa(syscall.Getpid()))
+	newRootfsURL := path.Join(fmt.Sprintf(DefaultRootfsLocation, name), "newrootfs")
 	//make /mnt
 	if err := buildNewRootfs(newRootfsURL, volume); err != nil {
 		return fmt.Errorf("build new rootfs failed %v", err)
@@ -94,16 +105,6 @@ func Run(tty bool, comArr []string, volume string, name string) error {
 				Size:        1,
 			},
 		},
-	}
-
-	// var container_id string
-	//generate container id
-	t := time.Now().UTC().Unix()
-	buf := make([]byte, 5)
-	rand.Read(buf)
-	container_id := fmt.Sprintf("%x%x", t, buf[0:])
-	if name == "" {
-		name = container_id
 	}
 
 	if tty {
@@ -256,14 +257,14 @@ var RootLogURL = "/root/logs"
 
 func buildNewRootfs(newRootURL string, volume string) error {
 	//mkdir newRoolURL
-	_, err := os.Stat(newRootURL)
-	if err == nil {
-		//rm the dir
-		os.RemoveAll(newRootURL)
-		logrus.Debugf("remove newRootURL dir %s", newRootURL)
-	}
+	// _, err := os.Stat(newRootURL)
+	// if err == nil {
+	// 	//rm the dir
+	// 	os.RemoveAll(newRootURL)
+	// 	logrus.Debugf("remove newRootURL dir %s", newRootURL)
+	// }
 
-	err = os.Mkdir(newRootURL, 0755)
+	err := os.MkdirAll(newRootURL, 0755)
 	if err != nil {
 		return fmt.Errorf("mkdir newRootURL %s error %v", newRootURL, err)
 	}
