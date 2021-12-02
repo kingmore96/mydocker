@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 func stopContainer(containerName string) error {
@@ -22,8 +24,14 @@ func stopContainer(containerName string) error {
 	if err != nil {
 		return fmt.Errorf("strconv.Atoi(%s) error : %v", containerInfo.Pid, err)
 	}
+	//get pgid to stop the group(which is the pid of mydocker run)
+	pgid, err := syscall.Getpgid(ipid)
+	if err != nil {
+		return fmt.Errorf("syscall.Getpgid(%d) error : %v", ipid, err)
+	}
+	logrus.Debugf("container process pgid = %d", pgid)
 	//firstly send SIGTERM to container
-	err = syscall.Kill(-ipid, syscall.SIGTERM)
+	err = syscall.Kill(-pgid, syscall.SIGTERM)
 	if err != nil {
 		return fmt.Errorf("kill -15 -%v error : %v", ipid, err)
 	}
@@ -88,10 +96,12 @@ func groupTerminated(groupId string) (bool, error) {
 	input := bufio.NewScanner(stdout)
 	line := 0
 	for input.Scan() {
-		//fmt.Println(input.Text())
+		logrus.Debugf("%s", input.Text())
+		// fmt.Println(input.Text())
 		line += 1
 	}
-	//fmt.Println("====")
+	// fmt.Println("====")
+	logrus.Debugln("======")
 
 	//logrus.Debugf("line = %d", line)
 	if input.Err() != nil {
